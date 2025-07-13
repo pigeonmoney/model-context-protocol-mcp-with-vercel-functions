@@ -1,9 +1,9 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"; // Correct import
-
-import { Client } from '@hubspot/api-client'; // Official HubSpot client
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { Client } from '@hubspot/api-client';
 
 const hubspotClient = new Client({ accessToken: process.env.HUBSPOT_ACCESS_TOKEN });
-console.log('HubSpot client initialized with token:', !!process.env.HUBSPOT_ACCESS_TOKEN); // Debug log
+console.log('HubSpot client initialized with token:', !!process.env.HUBSPOT_ACCESS_TOKEN);
 
 const tools = [
   {
@@ -63,6 +63,30 @@ const prompts = [
 
 const resources = [];
 
-const mcpServer = new McpServer({ tools, prompts, resources }); // Correct instantiation
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.status(405).end('Method Not Allowed');
+    return;
+  }
 
-export default mcpServer;
+  const server = new McpServer({
+    name: 'hubspot-mcp-server',
+    version: '1.0.0',
+    tools,
+    prompts,
+    resources,
+  });
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // Stateless mode (no Redis needed)
+  });
+
+  await server.connect(transport);
+
+  await transport.handleRequest(req, res, req.body);
+
+  // Cleanup on response close
+  res.on('close', () => {
+    transport.close();
+  });
+}
