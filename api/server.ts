@@ -1,8 +1,9 @@
-import { createMcpServer } from '@mcp-sdk/server';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"; // Correct import
+
 import { Client } from '@hubspot/api-client'; // Official HubSpot client
 
 const hubspotClient = new Client({ accessToken: process.env.HUBSPOT_ACCESS_TOKEN });
-console.log('HubSpot client initialized with token:', !!process.env.HUBSPOT_ACCESS_TOKEN); // Debug log: true if token exists
+console.log('HubSpot client initialized with token:', !!process.env.HUBSPOT_ACCESS_TOKEN); // Debug log
 
 const tools = [
   {
@@ -15,9 +16,15 @@ const tools = [
       },
     },
     async call(input: { limit?: number }) {
-      const limit = input.limit || 10;
-      const response = await hubspotClient.crm.contacts.basicApi.getPage(limit);
-      return response.results;
+      try {
+        const limit = input.limit || 10;
+        const response = await hubspotClient.crm.contacts.basicApi.getPage(limit);
+        console.log('HubSpot get_contacts success:', response.results.length);
+        return response.results;
+      } catch (error) {
+        console.error('HubSpot get_contacts error:', error.message);
+        throw error;
+      }
     },
   },
   {
@@ -33,28 +40,29 @@ const tools = [
       required: ['email'],
     },
     async call(input: { firstname?: string; lastname?: string; email: string }) {
-      const properties = {
-        firstname: input.firstname,
-        lastname: input.lastname,
-        email: input.email,
-      };
-      const response = await hubspotClient.crm.contacts.basicApi.create({ properties });
-      return response;
+      try {
+        const properties = {
+          firstname: input.firstname,
+          lastname: input.lastname,
+          email: input.email,
+        };
+        const response = await hubspotClient.crm.contacts.basicApi.create({ properties });
+        console.log('HubSpot create_contact success:', response.id);
+        return response;
+      } catch (error) {
+        console.error('HubSpot create_contact error:', error.message);
+        throw error;
+      }
     },
   },
-  // Add more tools as needed, e.g., for companies or deals
-  // Example: hubspot_get_companies using hubspotClient.crm.companies.basicApi.getPage()
 ];
 
 const prompts = [
-  // Optional: System prompts for AI context
   { content: 'You are a HubSpot CRM assistant. Use tools to interact with data.' },
 ];
 
-const resources = [
-  // Optional: Add resources like vector stores if needed later
-];
+const resources = [];
 
-const mcpServer = createMcpServer({ tools, prompts, resources });
+const mcpServer = new McpServer({ tools, prompts, resources }); // Correct instantiation
 
 export default mcpServer;
